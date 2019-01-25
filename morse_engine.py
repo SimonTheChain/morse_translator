@@ -227,7 +227,7 @@ class MorseEngine(object):
                 self.beep.play_beep()
 
             else:
-                time.sleep(1)
+                time.sleep(0.5)
 
 
 def main():
@@ -237,6 +237,7 @@ def main():
     print(morse_str)
     morse_numeric = engine.convert_to_numeric(morse_str)
     engine.convert_to_audio(morse_numeric)
+    engine.beep.terminate_pyaudio()
 
 
 if __name__ == "__main__":
