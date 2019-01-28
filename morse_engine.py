@@ -233,8 +233,9 @@ class MorseEngine(object):
 def main():
     engine = MorseEngine()
     message = "Hello World".upper()
+    print("Message: {}".format(message))
     morse_str = engine.encrypt(message)
-    print(morse_str)
+    print("Morse code: {}".format(morse_str))
     morse_numeric = engine.convert_to_numeric(morse_str)
     engine.convert_to_audio(morse_numeric)
     engine.beep.terminate_pyaudio()
