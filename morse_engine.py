@@ -5,12 +5,20 @@
 
 
 import time
+import struct
+import threading
+import logging
 
 import pyaudio
 import numpy as np
 
+# from highest to lowest: WARNING, INFO, DEBUG, NOTSET
+logging.basicConfig(level=logging.DEBUG)
+
 
 class Beep(object):
+
+    CHUNK = 1024
 
     def __init__(self, volume=0.5, sampling_rate=44100, duration=1.0, sine_frequency=440.0):
         self._pyaudio_obj = pyaudio.PyAudio()
@@ -18,6 +26,7 @@ class Beep(object):
         self.sampling_rate = sampling_rate
         self.duration = duration
         self.sine_frequency = sine_frequency
+        self.recording = False
 
     def _generate_samples(self):
         """
@@ -32,7 +41,7 @@ class Beep(object):
 
         return samples
 
-    def _open_stream(self):
+    def open_stream(self, input_audio=False):
         """
         Opens an audio stream
         :return: stream
@@ -42,7 +51,9 @@ class Beep(object):
                 format=pyaudio.paFloat32,
                 channels=1,
                 rate=self.sampling_rate,
-                output=True
+                input=input_audio,
+                output=True,
+                frames_per_buffer=self.CHUNK
             )
 
             return stream
@@ -55,7 +66,7 @@ class Beep(object):
         Plays the samples on the stream
         :return: None
         """
-        stream = self._open_stream()
+        stream = self.open_stream()
 
         if not stream:
             return
@@ -65,12 +76,65 @@ class Beep(object):
         stream.stop_stream()
         stream.close()
 
+    def read_beep(self):
+        """
+
+        :return:
+        """
+        stream = self.open_stream(input_audio=True)
+
+        if not stream:
+            return
+
+        logging.debug("Stream initialized")
+
+        frames = []
+
+        while self.recording:
+            data = stream.read(self.CHUNK)
+            frames.append(data)
+
+        data_int = []
+
+        logging.debug("Converting")
+
+        for f in frames:
+            data_int.append(struct.unpack(str(self.CHUNK), f))
+
+        print(data_int)
+
     def terminate_pyaudio(self):
         """
         Terminates the pyaudio object
         :return:
         """
         self._pyaudio_obj.terminate()
+
+
+class InputThread(threading.Thread):
+
+    def __init__(self):
+        threading.Thread.__init__(self)
+        self.beep = Beep()
+        self.recording = False
+        self.stream = None
+
+    def setup_recording(self):
+        self.recording = True
+        self.stream = self.beep.open_stream(input_audio=True)
+
+    def run(self):
+        self.setup_recording()
+        frames = []
+        data_int = []
+
+        while self.recording:
+            data = self.stream.read(self.beep.CHUNK)
+            # data_int.append(struct.unpack(str(self.beep.CHUNK) + "B", data))
+            data_int.append(int.from_bytes(data, byteorder='big', signed=True))
+            frames.append(data)
+
+        self.beep.
 
 
 class MorseEngine(object):
@@ -123,6 +187,8 @@ class MorseEngine(object):
 
     def __init__(self):
         self.beep = Beep()
+        self.speed = 1
+        self.space_duration = 1
 
     def encrypt(self, message):
         """
@@ -191,8 +257,7 @@ class MorseEngine(object):
 
         return decipher
 
-    @staticmethod
-    def convert_to_numeric(morse_string):
+    def convert_to_numeric(self, morse_string):
         """
         Converts a morse string into a list of numeric values
         :param morse_string: Morse-encoded string
@@ -205,10 +270,10 @@ class MorseEngine(object):
                 numeric_lst.append(0)
 
             elif character == ".":
-                numeric_lst.append(0.5)
+                numeric_lst.append(0.5 * self.speed)
 
             elif character == "-":
-                numeric_lst.append(1.5)
+                numeric_lst.append(1.5 * self.speed)
 
             else:
                 raise ValueError("Unrecognized character in string")
@@ -227,7 +292,7 @@ class MorseEngine(object):
                 self.beep.play_beep()
 
             else:
-                time.sleep(0.5)
+                time.sleep(0.5 * self.space_duration)
 
 
 def main():
@@ -241,5 +306,19 @@ def main():
     engine.beep.terminate_pyaudio()
 
 
+def record():
+    thread_input = InputThread()
+    print("Recording start")
+    thread_input.start()
+
+    for i in range(10, 0, -1):
+        print(i)
+        time.sleep(1)
+
+    thread_input.recording = False
+    print("Recording stop")
+
+
 if __name__ == "__main__":
-    main()
+    # main()
+    record()
